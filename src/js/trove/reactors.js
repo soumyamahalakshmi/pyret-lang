@@ -143,7 +143,7 @@
           }).start();
         }),
         "simulate-trace": runtime.makeMethod1(function(self, limit) {
-          checkArity(1, arguments, "simulate-trace", true);
+          checkArity(2, arguments, "simulate-trace", true);
           c1("simulate-trace", limit, annNatural);
           function help(r, i) {
             return r.then(function(rval) {
