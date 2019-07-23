@@ -4,7 +4,9 @@
     { "import-type": "builtin", "name": "valueskeleton" },
     { "import-type": "builtin", "name": "table" }
   ],
-  nativeRequires: [],
+  nativeRequires: [
+    "pyret-base/js/js-numbers",
+  ],
   provides: {
     shorthands: {
       "RofA": ["tyapp", ["local", "Reactor"], [["tid", "a"]]],
@@ -60,7 +62,7 @@
     },
   },
 
-  theModule: function(runtime, _, uri, reactorEvents, VSlib, tables, reactorLib) {
+  theModule: function(runtime, _, uri, reactorEvents, VSlib, tables, jsnums) {
     var gf = runtime.getField;
     var gmf = function(m, f) { return gf(runtime.getField(m, "values"), f); }
     var gtf = function(m, f) { return gf(m, "types")[f]; }
@@ -89,11 +91,10 @@
     };
 
     var annEvent = gtf(reactorEvents, "Event");
-    var annNatural = ann("Natural Number", function(val) {
-        return runtime.isNumber(val) && jsnums.isInteger(val)
-          && jsnums.greaterThanOrEqual(val, 0, runtime.NumberErrbacks);
-    });
-    var annObject = ann("Object", function(val) { return runtime.isObject(val); });
+    var annNatural = runtime.makeFlatPredAnn(runtime.Number, runtime.makeFunction(function(val) {
+        return jsnums.isInteger(val) && jsnums.greaterThanOrEqual(val, 0, runtime.NumberErrbacks);
+    }, "Natural Number"), "Natural Number");
+    var annObject = runtime.Object;
     
     function applyBrand(brand, val) {
       return gf(brand, "brand").app(val);
