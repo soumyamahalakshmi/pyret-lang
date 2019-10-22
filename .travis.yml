@@ -46,6 +46,6 @@ deploy:
   detect_encoding: true
   on:
     repo: soumyamahalakshmi/pyret-lang
-    branch: anchor-sound
+    branch: travis-demo
   secret_access_key:
     secure: g/SIwV2SxviJ5S8IMIAFVTtX9mGRXQEu1rJLoBoLOgWftdIFC8BSPo3BIF6b/V+fcjP1tqaiE3yG88PyRH403y7YZHEWZm2FoalVG8hPDdV/bSKen5O+m8f4FQttzzPCXTOu7A+5eyRu+MP0BvDdY/OdbyCAdo1ChiX/bw50uls/HYu00r1cU8fx+ftjT9IecK+msK/+CCL9lkMOeR+YxK7S3SLeP6+5GhWU2tTEz9uHvGfEyLzf6Ch1WivMh1jhvWawLJI26VcgTC1S6Z7N0y/IX7bJkqxueBJoj/Qm9yWRGqQZiZdATDqHlGj8ZfkD8ESowKqrFJyiT4jU4R/GQa7Y83z525YjmTuIAh0LH/TaH71r93mvmdJsnhkP16sSSfTxyw9VaBc32yl1rfeZReSg4Ov32vAR/PMTA5fspA5OOzEsLNceF8mE60a7heE5BxtAJOadCM+YSDxbxtheOoGnNNR17sKAYb6AK+ne7c9MjXJsscwY0Jo3hg90/JdOETcfHLLqSQuVXLMD+WvqJQhdB+2SkW3ELeTlOqLcAlacQA/LzJj/bG3kW4jWs2POzuryctHm+UnTgu0XW7ktIGH3IQ7g/7w0nlwBR+A0bJXmy7TQow2scZzebm8Rt9s5CVFuSG4CWXVPZ06A93n0lK8MUwLbqeE4P59dVHzDN0g=
