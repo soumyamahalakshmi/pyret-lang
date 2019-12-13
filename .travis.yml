@@ -1,10 +1,11 @@
 env:
-  secure: HuMEH1MDVt0br36tMjkcpC520OIA+nWV5fACPSxUeRfB86lc+n3WDbsC1qC386QOv5hKREcREGTIGF591GY04ApUmQlWNJymk2JjAkVKO2Dp3/jtBeFPXDbQ+sOAkfgcTgoC2yRWOfAAj1nJi1hKw0sZAwLP2n3KMjGSCYN8zGw=
+  secure: VUzGIHwCM6SIsa/pbtcMOA8TSwhfomiRomlHYEPrJFyZ+2sgcNtOX5A67w+hV9LcTtQFwKGmXUwlr0gfo2O82ZBLqIJ/fEPztC7mJxZNe4Hh6sPA+EFQz0Zfbce0aMWJ/Xct6+tR5COBt1RhhYpM1xyol3xFKr8sO13pfAT5Qb7iQ/M8WcMivfqMMg7Ue/PadJ90BsgyAPtXPMdfJ/Sq8KvrBxxgxPM5bPIx+lDn85E3KCS5wV8dcHpjOYjotqW5klRioE0Br5vWOdYUeWndNq9oGiavHybuUZF44qoGTeREjiKPxC4CVzvM4M7dyxQgkH4H54X2AQwb7RBCgsuku7+KK7Vnn2F5v/5hsyLhNqo6qCwVU3xodZeikgaO4RKdgEY65qATsd7WeIvSQcOjvhnnXdIDoqI2U+9tclhAQKTwlgDzg5NU/2MM6q5NetRV70zKwKAzt8n6Bf/e8mD5vDbNGi2WJLBF3FQD0JQsU79tGkGw8q91exRSms7QFWX1pvpNZuf+AD+YEHw8WmDJRcWc8sbD5Lv0iKE3K7Dnipth1hDZh69WUrZSjhByFAVsDam2leZ2My/I8nlXxtdqhdAOIf14Pm+0/5uGDb5IMtBTCOoAONLzsuBddX/pjmdxdgeg8neLPLnk1y4tKScsSIIpyG/ymmcePJNBA7uEeOM=
   global:
   - BROWSER_BINARY=/usr/bin/google-chrome
   - BROWSER="chrome"
   - SHOW_BROWSER="false"
   - BASE_URL="http://localhost:8080"
+  - secure: P1AJEh9DPWanaONF4A92bxVn1j+PQgtAJ2bcc4SSHH8o5hzjgcor8zM7E3g+lkrSLFVQH3K7ghny97+Bvl7CNGGypGhVjWNzRkWXflg8BcNTNSg0U4lKlVtOIfalczUCg2PNCt0I84Avwqw739ku4irNMbubPLkOdQpH1H9uKH4DTXE5Kw9m4r3iWxv3VYMC3qqyiaIhLNqu3694UroDSfgP23r8hqylzu3xmdRRBCeEbBJj5tedNAfk0/GNCLWRTtXQzq6pjj09gaSWJRZ2aJhKpefogdYzv45rw8qL7OyyzYy27Qo+bqSJYCvoHePdnisddU2l0D5bclDNkKIT4lyUL9FgGHUPdqTxiGex8suBrwxXbkgGUGcn4CwK6ihEMeI3JN0CoK7Lc1LA1l9wfztX6tZdWx+ygwi9TfOa8xDQ1tJ+LqByusIOyWHcLps3EizeWCIEKPUszG9dAlRKwl10LiKxZmY568YPt1RQ67Ghmc9oEYepKjWL+NqYYFprspn4zgeqfvIWaIiu+clNi3dnZALDkfns2Z3um6PptxC0vzaXUkEoDhY99UpK5HZIqged32Hy7V8cXN7nJlLoGcdEztxaL9sRR+EGX20OnzSTc1JKmkl5FYNWZ3aJ9Zdjsv1Hfjr/Nw3PY1k1vYPMe3CPl2wzYWYJDv3kMA8J/Fo=
 git:
   submodules: false
 language: node_js
@@ -20,9 +21,31 @@ script:
 - npm run all-tests
 notifications:
   slack:
-    secure: kHQvp3HZL5GRY58XrGdRhZKtUvGrxgsAKMawYYNO4PA9NXlr5EYwbYBCrud1DNJs6kdEPK48ItSnsWXKoDZTS+g96b56t8vjHl2d98EN4WwvORj3g9NNiZ0SESL2LUwFa5vCxlnTbxfCQcfNpStGrwYZZ9DnIGTDuLO2EqZxvP0=
+    secure: CGDy4Mshlf2q6RrHhn01HgTbtBZGQ8H0upbFeE7ONr2/YWH665/GB4+Dy9FliZyyfpK+H1zvK56MYyu+uOHPm5+CtbCi1GTsZeJMwHVlU110fZLaMdx9y0ze0KI0etp5CSG5YDHBtIFo4PViP4mkLtCogYgAfayln7+lw+ActtE2zaSE3SXH0oONM++dtqEJ7dya+//g/1rbk1qjHzrIEwc/LN/hbhIbGvsRqVc4lnoLJaX5iB/YFGPrysEIl9bMPLlrxZ4PT6sLFqWbSYNaEKmcFcow+mkuQ+5SSI25JRQVXSB2q/wmJiHUkS21RXf0Il5dCY0gvsmDMtawZTeidUxatNUG7kColNrrTLQ8fMRdSexSPXiS+yS23XcQW9znfHnRcmjj6HYi4tBzohPGjvDvv/zLIeKELnRyHJBYG1Qv45PX/1Ce9br47CrSNcXR1347rIyHFIvIIkfUJyoys2SEtnADFL1GuTf2oVElVB9/PysBlZ9483DMRhUEl/QRpR3gyWWhbq56KffdU+O9qeVvhjeU4jowbxsOFarRV5VPz+Trjw5DZ8Xl7o9pZkgzazqassa76Nq2biUzYbSKChYLg6nl40U1Tu7Xl92x4Ak9ly9XlJURADeZwH3VMeq6lmx3QH6vmvvWDlW9bTyXzompZZzgZ/jIsrBnOuAMb9g=
 addons:
   chrome: stable
 after_failure:
-  - sleep 10
-  - echo "--actual end of .travis script--"
+- sleep 10
+- echo "--actual end of .travis script--"
+before_deploy:
+- cd ide
+- npm install
+- echo "JOE  CI=false below avoids stopping the build on warnings from webpack about
+  require targets"
+- echo "JOE  We want to see them, but not be blocked on them"
+- CI=false npm run build
+deploy:
+  provider: s3
+  acl: public_read
+  access_key_id:
+    secure: UUDuKKGL0AhD9QOTbmYgBFaBt4wVNvfkE2hGN2V10Lb+pj3uUXE/+SGoXP3Wh+EpPNUAnkrrsfS7qetRasQ0ytKSY/RPIDLqIcF/1cEP98rOXN7uybju1nmjgbSKctpyKSVGaNrEMstWR6y+/7ZzOeSj3ereP9n88Zq/UV7Fox8aiDmr/v+zQh8qXzma977u9ACSMoaAQvok0kImE33dvXD1YMXYeGiH10dMTVc50/q/K1NwHffTrBGtpm0vwlY3C67IbvHKGmCX4meljuAFTuiuNJqOMlBSN8C0jGc65vf6Xry+th1SeX6m/X68H2YUI4LxomSsUgYbukRHe1R6JrETAwxPqeOFVFeMqhdLXFugLse6pQApSY2xOp1Qh+NFc7La7QUUCJ219tUymaIIzTjHgn7pPdPFinczhx8e7Zuq7WRodjmMqytZG7C/sPARBTMi2cKb3KIPj0qgek12ngRJiESFOjHKOZ52b/T6oSYI+IuirPjCHGZV9GAcIIiOyV1rOnkk4+Luf7zXIO8LoJsnj0aYJBrWrKjljbf1pMlg9UfA/XiL1J7DKehjHA13bvY8B1Y/SpBlRkQZw7Lj0vEXnYixNF0TAGDQ0BO9bz/CqEBW/CLRgBp2FQjlLtC6dOEqjdMd929O8s9BkMaRdsmhWHdFZr1LhfYpI/HbGZI=
+  bucket: pyret-anchor-sound-deploy
+  local-dir: build
+  upload-dir: anchor-sound
+  skip_cleanup: true
+  detect_encoding: true
+  on:
+    repo: soumyamahalakshmi/pyret-lang
+    branch: anchor-sound
+  secret_access_key:
+    secure: g/SIwV2SxviJ5S8IMIAFVTtX9mGRXQEu1rJLoBoLOgWftdIFC8BSPo3BIF6b/V+fcjP1tqaiE3yG88PyRH403y7YZHEWZm2FoalVG8hPDdV/bSKen5O+m8f4FQttzzPCXTOu7A+5eyRu+MP0BvDdY/OdbyCAdo1ChiX/bw50uls/HYu00r1cU8fx+ftjT9IecK+msK/+CCL9lkMOeR+YxK7S3SLeP6+5GhWU2tTEz9uHvGfEyLzf6Ch1WivMh1jhvWawLJI26VcgTC1S6Z7N0y/IX7bJkqxueBJoj/Qm9yWRGqQZiZdATDqHlGj8ZfkD8ESowKqrFJyiT4jU4R/GQa7Y83z525YjmTuIAh0LH/TaH71r93mvmdJsnhkP16sSSfTxyw9VaBc32yl1rfeZReSg4Ov32vAR/PMTA5fspA5OOzEsLNceF8mE60a7heE5BxtAJOadCM+YSDxbxtheOoGnNNR17sKAYb6AK+ne7c9MjXJsscwY0Jo3hg90/JdOETcfHLLqSQuVXLMD+WvqJQhdB+2SkW3ELeTlOqLcAlacQA/LzJj/bG3kW4jWs2POzuryctHm+UnTgu0XW7ktIGH3IQ7g/7w0nlwBR+A0bJXmy7TQow2scZzebm8Rt9s5CVFuSG4CWXVPZ06A93n0lK8MUwLbqeE4P59dVHzDN0g=

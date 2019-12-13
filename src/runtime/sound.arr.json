@@ -1,0 +1,138 @@
+{   
+    "requires": [
+        { "import-type": "builtin", "name": "global" }
+
+            ],
+    "provides": {
+        "values": {
+            "get-multi-channel-data-arrays": ["arrow", [
+                    ["local", "Sound"]
+                ],
+                ["RawArray", ["RawArray", "Number"]]
+            ],
+            "get-channel-data-array": ["arrow", [
+                    ["local", "Sound"], "Number"
+                ],
+                ["RawArray", "Number"]
+            ],
+            "sound-duration": ["arrow", 
+            [["local", "Sound"]], 
+            "Number"],
+            "sound-sample-rate": ["arrow", 
+            [["local", "Sound"]], 
+            "Number"],
+            "sound-num-channels": ["arrow", [["local", "Sound"]], "Number"],
+            "sound-num-samples": ["arrow", [["local", "Sound"]], "Number"],
+            "sounds-equal": ["arrow", [["local", "Sound"], ["local", "Sound"]], "Boolean"],
+            "is-sound": ["arrow", ["Any"], "Boolean"],
+            "make-sound": ["arrow", ["Number", ["RawArray", "Number"]],
+                ["local", "Sound"]
+            ],
+            "make-multi-channel-sound": ["arrow", ["Number", ["RawArray", ["RawArray", "Number"]]],
+                ["local", "Sound"]
+            ],
+            "get-sound-from-url": ["arrow", ["String"],
+                ["local", "Sound"]
+            ],
+            "overlay-list": ["arrow", [
+                    ["RawArray", ["local", "Sound"]]
+                ],
+                ["local", "Sound"]
+            ],
+            "overlay": ["arrow", [
+                    ["local", "Sound"], ["local", "Sound"]
+                ],
+                ["local", "Sound"]
+            ],
+            "concat-list": ["arrow", [
+                   ["RawArray", ["local", "Sound"]]
+                ],
+                ["local", "Sound"]
+            ],
+            "concat": ["arrow", [
+                    ["local", "Sound"], ["local", "Sound"]
+                ],
+                ["local", "Sound"]
+            ],
+            "adjust-playback-speed": ["arrow", [
+                    ["local", "Sound"], "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "set-sample-rate": ["arrow", [
+                    ["local", "Sound"], "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "crop-by-time": ["arrow", [
+                    ["local", "Sound"], "Number", "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "crop-by-index": ["arrow", [
+                    ["local", "Sound"], "Number", "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "normalize-sound": ["arrow", [
+                    ["local", "Sound"]
+                ],
+                ["local", "Sound"]
+            ],
+            "get-tone": ["arrow", ["String", "Number"],
+                ["local", "Sound"]
+            ],
+            "get-sine-wave": ["arrow", ["Number"],
+                ["local", "Sound"]
+            ],
+            "get-cosine-wave": ["arrow", ["Number"],
+                ["local", "Sound"]
+            ],
+            "fade-in": ["arrow", [
+                    ["local", "Sound"]
+                ],
+                ["local", "Sound"]
+            ],
+            "fade-out": ["arrow", [
+                    ["local", "Sound"]
+                ],
+                ["local", "Sound"]
+            ],
+            "fade-in-by-time": ["arrow", [
+                    ["local", "Sound"], "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "fade-out-by-time": ["arrow", [
+                    ["local", "Sound"], "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "fade-in-by-index": ["arrow", [
+                    ["local", "Sound"], "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "fade-out-by-index": ["arrow", [
+                    ["local", "Sound"], "Number"
+                ],
+                ["local", "Sound"]
+            ],
+            "remove-vocals": ["arrow", [
+                    ["local", "Sound"]
+                ],
+                ["local", "Sound"]
+            ],
+            
+            "get-note": ["arrow", ["String", "Number", "Number"],
+                ["local", "Sound"]
+            ]
+        },
+        "datatypes": {
+            "Sound": ["data", "Sound", [],
+                [], {}
+            ]
+        },
+        "aliases": {}
+    }
+}

@@ -3,6 +3,7 @@ const assert = require('assert');
 const immutable = require('immutable');
 export const stopify = require('@stopify/stopify');
 const browserFS = require('./browserfs-setup.ts');
+const fileSaver = require('file-saver');
 
 (window as any)["stopify"] = stopify;
 
@@ -13,7 +14,8 @@ const nodeModules = {
   'assert': assert,
   'csv-parse/lib/sync': csv,
   'fs': browserFS.fs,
-  'immutable': immutable
+  'immutable': immutable,
+  'file-saver': fileSaver
 };
 
 function wrapContent(content: string): string {
@@ -38,11 +40,14 @@ export const makeRequireAsync = (
         throw new Error("Path did not exist in requireSync: " + nextPath);
       }
       const stoppedPath = nextPath + ".stopped";
-      if(stoppedPath in cache) { resolve(cache[stoppedPath]); return; }
+      // Get the absolute path to uniquely identify modules
+      // Cache modules based upon the absolute path for singleton modules
+      const cachePath = path.resolve(stoppedPath);
+      if(cachePath in cache) { resolve(cache[cachePath]); return; }
       let runner: any = null;
       const contents = String(fs.readFileSync(nextPath));
       const toStopify = wrapContent(contents);
-      runner = stopify.stopifyLocally(toStopify, {});
+      runner = stopify.stopifyLocally(toStopify, {newMethod: "direct"});
       if(runner.kind !== "ok") { reject(runner); }
       fs.writeFileSync(stoppedPath, runner.code);
       const stopifyModuleExports = {
@@ -59,7 +64,7 @@ export const makeRequireAsync = (
         RegExp,
         stopify,
         Error,
-        Image: () => { return new Image(); },
+        Image,
         decodeURIComponent,
         require: requireAsync,
         "module": stopifyModuleExports,
@@ -71,20 +76,31 @@ export const makeRequireAsync = (
         console: console,
         parseFloat,
         isNaN,
-        isFinite
+        isFinite,
+        AudioContext: () => { return new AudioContext(); },
+        XMLHttpRequest: () => { return new XMLHttpRequest(); }
       });
       runner.path = nextPath;
       currentRunner = runner;
-      runner.run((result: any) => {
-        // TODO(Alex): fix stopify bug where evaled result is not passed to AbstractRunner.onDone callback
-        cwd = oldWd;
-        if(result.type !== "normal") {
-          reject(result);
-          return;
-        }
-        const toReturn = runner.g.module.exports;
-        cache[stoppedPath] = toReturn;
-        resolve(toReturn);
+
+      resolve({
+        run: new Promise((resolve, reject) => {
+          return runner.run((result : any) => {
+            cwd = oldWd;
+            if(result.type !== "normal") { reject(result); }
+            else {
+              const toReturn = runner.g.module.exports;
+              cache[cachePath] = toReturn;
+              resolve(toReturn);
+            }
+          })
+        }),
+        pause: (callback: (line: number) => void): void => {
+          runner.pause(callback);
+        },
+        resume: (): void => {
+          runner.resume();
+        },
       });
     });
   };
@@ -100,7 +116,10 @@ export const makeRequireAsync = (
       throw new Error("Path did not exist in requireSync: " + nextPath);
     }
     const stoppedPath = nextPath + ".stopped";
-    if(stoppedPath in cache) { return cache[stoppedPath]; }
+    // Get the absolute path to uniquely identify modules
+    // Cache modules based upon the absolute path for singleton modules
+    const cachePath = path.resolve(stoppedPath);
+    if(cachePath in cache) { return cache[cachePath]; }
     currentRunner.pauseK((kontinue: (result: any) => void) => {
       const lastPath = currentRunner.path;
       const module = {
@@ -123,6 +142,7 @@ export const makeRequireAsync = (
         fs.writeFileSync(stoppedPath, stopifiedCode);
       }
       currentRunner.evalCompiled(stopifiedCode, (result: any) => {
+        cwd = oldWd;
         if(result.type !== "normal") {
           kontinue(result);
           return;
@@ -133,7 +153,7 @@ export const makeRequireAsync = (
         currentRunner.g.module = lastModule;
         // Need to set 'exports' global to work with TS export desugaring
         currentRunner.g.exports = lastModule.exports;
-        cache[stoppedPath] = toReturn;
+        cache[cachePath] = toReturn;
         kontinue({ type: 'normal', value: toReturn });
       });
     });
@@ -170,6 +190,9 @@ export const makeRequire = (basePath: string): ((importPath: string) => any) => 
     const contents = fs.readFileSync(nextPath);
     // TS 'export' syntax desugars to 'exports.name = value;'
     // Adding an 'exports' parameter simulates the global 'exports' variable
+    // Also, the comment below has meaning to eslint and makes it ignore the
+    // use of the Function constructor (which we do intend)
+    // eslint-disable-next-line
     const f = new Function("require", "module", "exports", contents);
     const module = {
       exports: { 

@@ -54,6 +54,7 @@ j-true = J.j-true
 j-false = J.j-false
 j-num = J.j-num
 j-str = J.j-str
+j-bool = J.j-bool
 j-return = J.j-return
 j-assign = J.j-assign
 j-if = J.j-if
@@ -284,9 +285,7 @@ fun nyi(name):
   { j-str("not implemented: " + name); [clist: j-expr(console([clist: j-str(name)]))] }
 end
 
-fun compile-s-op(context, l, op-l, op, left, right):
-  { lv; lstmts } = compile-expr(context, left)
-  { rv; rstmts } = compile-expr(context, right)
+fun compile-s-op(context, l, op-l, op, lv :: JExpr, rv :: JExpr):
   val = ask:
     # Pyret number operations compatible with JS numbers
     # Always assume Pyret numbers when compiling
@@ -331,7 +330,8 @@ fun compile-s-op(context, l, op-l, op, left, right):
     | op == "opand" then: j-binop(lv, J.j-and, rv)
     | otherwise: nyi(op)
   end
-  { val; lstmts + rstmts; lv; rv }
+
+  val
 end
 
 data BindableKind:
@@ -372,7 +372,6 @@ end
 
 #
 # Does NOT support method expressions
-# TODO(alex): Deprecate method expressions?
 #
 # Generates a function and a nested function of the form:
 #
@@ -406,8 +405,6 @@ end
 # Rebinding methods should be handled by a RUNTIME function.
 # Rebinding should simply be calling something like:
 #   'oldObject.method["$binder"](newObject)'
-#
-# TODO(alex): Generate rebinding call
 #
 fun compile-method(context, 
       l :: Loc,
@@ -483,6 +480,15 @@ fun compile-method(context,
   { j-id(binder-fun-name); cl-sing(j-expr(binder-fun)) }
 end
 
+fun compile-srcloc(l):
+  contents = cases(Loc) l:
+    | builtin(name) => [clist: j-str(name)]
+    | srcloc(uri, sl, sc, schar, el, ec, echar) =>
+      [clist: j-str(uri), j-num(sl), j-num(sc), j-num(schar), j-num(el), j-num(ec), j-num(echar)]
+  end
+  j-list(false, contents)
+end
+
 fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
   cases(A.Expr) expr block:
     | s-module(l, answer, dms, dvs, dts, checks) =>
@@ -490,31 +496,42 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
 
       # Expose top-level values and variables to outside modules
       # Use variable names as keys
-      {fields; stmts} = for fold({fields; stmts} from {cl-empty; cl-empty}, dv from dvs) block:
+      {fields; stmts; locs} = for fold({fields; stmts; locs} from {cl-empty; cl-empty; cl-empty}, dv from dvs) block:
         cases(A.DefinedValue) dv:
           | s-defined-value(name, def-v) =>
             block:
               {val; field-stmts} = compile-expr(context, def-v)
-
-              { cl-cons(j-field(name, val), fields); field-stmts + stmts }
+              sloc = compile-srcloc(def-v.l)
+              { cl-cons(j-field(name, val), fields); field-stmts + stmts;
+                cl-cons(j-obj([clist:
+                  j-field("name", j-str(name)),
+                  j-field("srcloc", sloc)]), locs) }
             end
 
-          | s-defined-var(name, id) =>
-            block:
-              # TODO(alex): Box variables so external code can mutate variables
-              { cl-cons(j-field(name, j-id(js-id-of(id))), fields); stmts }
-            end
+          | s-defined-var(name, id, id-loc) =>
+            sloc = compile-srcloc(id-loc)
+            # TODO(alex): Box variables so external code can mutate variables
+            { cl-cons(j-field(name, j-id(js-id-of(id))), fields); stmts;
+              cl-cons(j-obj([clist:
+                j-field("name", j-str(name)),
+                j-field("srcloc", sloc)]), locs) }
         end
       end
 
       check-results = rt-method("$checkResults", [clist: ])
+      traces = rt-method("$getTraces", [clist: ])
+
+      answer1 = fresh-id(compiler-name("answer"))
+      answer-var = j-var(answer1, a-exp)
 
       ans = j-obj(fields + [clist:
-                j-field("$answer", a-exp),
-                j-field("$checks", check-results)])
+                j-field("$answer", j-id(answer1)),
+                j-field("$checks", check-results),
+                j-field("$traces", traces),
+                j-field("$locations", j-list(true, locs))])
 
       assign-ans = j-bracket-assign(j-id(const-id("module")), j-str("exports"), ans)
-      {assign-ans; a-stmts + stmts}
+      {assign-ans; a-stmts + cl-sing(answer-var) + stmts}
     | s-block(l, exprs) => compile-seq(context, exprs)
     | s-num(l, n) => 
       e = if num-is-fixnum(n):
@@ -523,7 +540,12 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
         rt-method("_makeNumberFromString", [clist: j-str(tostring(n)), rt-field(NUMBER_ERR_CALLBACKS)])
       end
       {e; cl-empty}
-    | s-id(l, id) => {j-id(js-id-of(id)); cl-empty}
+    | s-id(l, id) =>
+      b = context.post-env.bindings
+      when b.has-key-now(id.key()) and not(b.get-value-now(id.key()).origin.new-definition):
+        context.free-bindings.set-now(id.key(), b.get-value-now(id.key()))
+      end
+      {j-id(js-id-of(id)); cl-empty}
     | s-id-letrec(l, id, _) => {j-id(js-id-of(id)); cl-empty}
     | s-id-modref(l, id, _, field) =>
       {objv; obj-stmts} = compile-expr(context, A.s-id(l, id))
@@ -544,11 +566,16 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
       {argvs; argstmts} = compile-list(context, args)
       { j-app(fv, argvs); fstmts + argstmts }
 
-    | s-srcloc(_, l) => { j-str("srcloc"); cl-empty }
+    | s-srcloc(_, l) =>
+      { compile-srcloc(l); cl-empty }
 
     | s-op(l, op-l, op, left, right) =>
-      { val; stmts; _lv; _rv } = compile-s-op(context, l, op-l, op, left, right)
-      { val; stmts }
+      { lv; l-stmts } = compile-expr(context, left)
+      { rv; r-stmts } = compile-expr(context, right)
+
+      val = compile-s-op(context, l, op-l, op, lv, rv)
+
+      { val; l-stmts + r-stmts }
 
     | s-lam(l, name, _, args, _, _, body, _, _, _) =>
 
@@ -797,7 +824,6 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
 
       datatype = cases(A.Ann) typ block:
         | a-name(_, name) =>
-          print(context.datatypes.keys-now())
           # Datatypes in env are key'd by the raw string name
           cases(Option) context.datatypes.get-now(name.toname()):
             | some(dt) => 
@@ -910,15 +936,18 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
     | s-template(l) => nyi("s-template")
     | s-method(l, name, params, args, ann, doc, body, _check-loc, _check, _blocky) =>
       # name is always empty according to parse-pyret.js:1280
-      # TODO(alex): Make s-method in non(s-obj) or with/shared member context a well-formedness error
+      # s-method in non(s-obj) or with/shared member context a well-formedness error
       #   Can only have s-method as the top-level expression of a field (i.e. no nesting)
+      # Assume s-methods are only in well-formed spots and callers will generate the
+      #   binding code correctly
+      # Return the binder function and the required statements
       
       # NOTE(alex): Currently cannot do recursive object initialization
       #   Manually assign the shared/with member with j-bracket vs returning a j-field
       { binder-func; method-stmts } = compile-method(context, l, name, args, body)
 
-      # Assume callers will generate binding code correctly
       { binder-func; method-stmts }
+
     | s-type(l, name, params, ann) => raise("s-type already removed")
     | s-newtype(l, name, namet) => raise("s-newtype already removed")
     | s-when(l, test, body, blocky) => 
@@ -1078,9 +1107,6 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
       #
 
       { check-block-val; check-block-stmts } = compile-expr(context, body)
-      # TODO(alex): insert test scaffolding here
-      # TODO(alex): insert check blocks inline or in a separate area?
-      # TODO(alex): check block returns?
 
       # Wrap the check block into a function (check-block)
       js-check-block-func-name = cases(Option) name:
@@ -1111,71 +1137,123 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
                    cause :: Option<Expr>) =>
 
       # Emits:
-      #   _checkTest(function() {
-      #     left-statements
-      #     right-statements 
-      #     return check-op(left-value, right-value);
-      #   }, loc, lhs, rhs);
+      #   _checkTest(lh-func: () -> any, rh-func: () -> any, 
+      #              test-func: (check-expr-result, check-expr-result) -> check-op-result, 
+      #              loc: String) -> void
+      #
+      #   _checkTest(function lh-func() {}, 
+      #              function rh-func() {}, 
+      #              function test-func(lhs, rhs) {}, loc);
       #
       # _checkTest: (test-thunk: () -> check-op-result, loc: string) -> void
+      # 
+      # check-expr-result = {
+      #   value: any,
+      #   exception: bool
+      # }
       #
       # check-op-result = {
-      #   success: boolean
-      #   lhs: any
-      #   rhs: any
+      #   success: boolean,
+      #   lhs: check-expr-result,
+      #   rhs: check-expr-result,
       # }
       #
       # Individual tests are wrapped in functions to allow individual tests to fail
       #  but still possible to run other tests
       
+      fun make-check-op-result(success :: JExpr, lhs :: JExpr, rhs :: JExpr):
+        j-obj([clist:
+          j-field("success", success),
+          j-field("lhs", lhs),
+          j-field("rhs", rhs),
+        ])
+      end
+
+      test-loc = j-str(l.format(true))
+
       check-op = cases(A.CheckOp) op:
         | s-op-is(_) => binop-result("op==")
         | s-op-is-not(_) => binop-result("op<>")
         | else => raise("NYI check op ID")
       end
 
-      { raw-js-test-val; raw-js-test-stmts; lhs; rhs } = cases(CheckOpDesugar) check-op:
+      cases(CheckOpDesugar) check-op:
         | binop-result(bin-op) =>
           cases(Option) right:
-            | some(right-expr) => 
-              # Assuming this compile-expr returns j-binop
-              { j-test-val; j-test-stmts; lhs; rhs } =
-                compile-s-op(context, l, l, bin-op, left, right-expr)
+            | some(right-expr) =>
+              fun thunk-it(name :: String, val :: JExpr, stmts :: CList<JStmt>):
+                body = j-block(cl-snoc(stmts, j-return(val)))
+                j-fun("0", name, cl-empty, body)
+              end
 
-              { j-test-val; j-test-stmts ; lhs; some(rhs) } 
+              fun exception-check(exception-flag :: JExpr, lhs :: JExpr, rhs :: JExpr):
+                check-body = j-block([clist: 
+                  j-return(make-check-op-result(j-bool(false), lhs, rhs))
+                ])
+                j-if1(exception-flag, check-body)
+              end
+              
+              # Thunk the LHS
+              { lhs; l-stmt } = compile-expr(context, left)
+              lh-func = thunk-it("LHS", lhs, l-stmt)
+
+              # Thunk the RHS
+              { rhs; r-stmt } = compile-expr(context, right-expr)
+              rh-func = thunk-it("RHS", rhs, r-stmt)
+
+              # Thunk the bin check op
+              lhs-param-name = fresh-id(compiler-name("lhs"))
+              rhs-param-name = fresh-id(compiler-name("rhs"))
+
+              lhs-value = j-bracket(j-id(lhs-param-name), j-str("value"))
+              # LHS exception check
+              lhs-exception = j-bracket(j-id(lhs-param-name), j-str("exception"))
+              lhs-exception-check = exception-check(
+                lhs-exception, 
+                j-id(lhs-param-name),
+                j-id(rhs-param-name)
+              )
+
+              rhs-value = j-bracket(j-id(rhs-param-name), j-str("value"))
+              # LHS exception check
+              rhs-exception = j-bracket(j-id(rhs-param-name), j-str("exception"))
+              rhs-exception-check = exception-check(
+                rhs-exception, 
+                j-id(lhs-param-name),
+                j-id(rhs-param-name)
+              )
+
+              # Assuming this compile-expr returns j-binop
+              j-test-val = 
+                compile-s-op(context, l, l, bin-op, lhs-value, rhs-value)
+
+              success-result = make-check-op-result(
+                j-test-val,
+                j-id(lhs-param-name),
+                j-id(rhs-param-name)
+              )
+
+              test-body-stmts = [clist: 
+                lhs-exception-check, 
+                rhs-exception-check, 
+                j-return(success-result)
+              ] 
+              test-body = j-block(test-body-stmts)
+              test-func = 
+                j-fun("0", "TEST", [clist: lhs-param-name, rhs-param-name], test-body)
+
+
+              tester-call-args = [clist: lh-func, rh-func, test-func, test-loc]
+              tester-call = j-expr(rt-method("$checkTest", tester-call-args))
+
+              { j-undefined; [clist: tester-call] }
 
             | none => raise("Attempting to use a binary check op without the RHS")
           end
+
         | refinement-result(the-refinement, negate) => raise("NYI check refinement")
         | predicate-result(predicate) => raise("NYI check predicate")
       end
-
-      test-loc = j-str(l.format(true))
-
-      # Thunk the JS test code; returns a check-op-result (described above)
-
-      # If there was no RHS expression, explicitly insert an 'undefined'
-      simple-return-fields = [clist: 
-        j-field("success", raw-js-test-val),
-        j-field("lhs", lhs),
-      ]
-      return-fields = cases(Option) rhs:
-        | some(right-expr) => cl-append(simple-return-fields, 
-                                        cl-sing(j-field("rhs", right-expr)))
-        | none => cl-append(simple-return-fields, 
-                            cl-sing(j-field("rhs", j-undefined)))
-      end
-      return-expr = j-obj(return-fields)
-
-      thunk-body = cl-snoc(raw-js-test-stmts, j-return(return-expr))
-      thunk = j-fun("0", "$check", cl-empty, j-block(thunk-body))
-
-      check-test-args = [clist: thunk, test-loc]
-
-      # TODO(alex): insert test scaffolding here
-      tester-call = j-expr(rt-method("$checkTest", check-test-args))
-
-      { j-undefined; [clist: tester-call] }
 
     | s-load-table(
         l :: Loc,
@@ -1690,10 +1768,6 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
 
     | s-spy-block(loc, message, contents) =>
 
-      # TODO(alex): make code generation aware of spy block options
-      # Emit with a special do-print/do-eval flag
-      # Do not emit
-
       # Model each spy block as a spy block object
       # SpyBlockObject {
       #   message: () -> String,
@@ -1703,6 +1777,8 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
       #
       # Translate spy blocks into:
       #   builtinSpyFunction(SpyBlockObject)
+      #
+      # Push responsibility of runtime spy-enabling to the builtinSpyFunction
       if context.options.enable-spies:
 
         # Generate spy code
@@ -1711,7 +1787,7 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
         { js-message-value; js-message-stmts } = cases(Option) message:
           | some(message-expr) => compile-expr(context, message-expr)
           
-          # TODO(alex): null or empty string?
+          # Use 'null' to signal the builtinSpyFunction that there was no spy block message
           | none => { j-null; cl-empty }
         end
 
@@ -1727,7 +1803,6 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
 
           js-spy-expr-func-name = fresh-id(compiler-name("spy-expr"))
 
-          # TODO(alex): what are j-fun.id
           js-spy-return = j-return(js-spy-value)
           js-spy-expr-func-block = j-block(cl-append(js-spy-stmts, cl-sing(js-spy-return)))
           js-spy-expr-fun = j-fun("0", js-spy-expr-func-name.to-compiled(), cl-empty, js-spy-expr-func-block)
@@ -1752,8 +1827,8 @@ fun compile-expr(context, expr) -> { J.JExpr; CList<J.JStmt>}:
                                 )
                               )
 
-        # TODO(alex): builtin spy function call or inline formatting/reporting?
         # Builtin spy function call
+        # Runtime is responsible for output
         spy-call = j-expr(rt-method("$spy", cl-sing(spy-block-obj)))
 
         { j-undefined; cl-sing(spy-call) }
@@ -1795,8 +1870,8 @@ fun gen-tuple-bind(context, fields, as-name, value):
 end
 
 
-fun create-prelude(prog, provides, env, options, shadow import-flags) block:
-  runtime-builtin-relative-path = options.runtime-builtin-relative-path
+fun create-prelude(prog, provides, env, free-bindings, options, shadow import-flags) block:
+
   fun get-base-dir( source, build-dir ):
     source-head = ask:
       | string-index-of( source, "file://" ) == 0 then: 7
@@ -1857,16 +1932,30 @@ fun create-prelude(prog, provides, env, options, shadow import-flags) block:
     string-index-of(s, prefix) == 0
   end
 
+
+  runtime-builtin-relative-path = options.runtime-builtin-relative-path
+
   fun uri-to-import(uri, name) block:
     ask:
       | starts-with(uri, "builtin://") then:
         builtin-name = string-substring(uri, 10, string-length(uri))
-        J.j-var(js-id-of(name), j-app(j-id(const-id("require")), [clist: j-str( relative-path + runtime-builtin-relative-path + builtin-name + ".arr.js")]))
+        the-path = cases(Option) runtime-builtin-relative-path:
+          | some(shadow runtime-builtin-relative-path) => runtime-builtin-relative-path + builtin-name + ".arr.js"
+
+          | none => relative-path + "../builtin/" + builtin-name + ".arr.js"
+        end
+        [clist:
+          J.j-var(js-id-of(name), j-app(j-id(const-id("require")), [clist: j-str(the-path)])),
+          J.j-expr(rt-method("addModule", [clist: j-str(uri), j-id(js-id-of(name))]))
+        ]
       | starts-with(uri, "jsfile://") or starts-with(uri, "file://") then:
         target-path = uri-to-real-fs-path(uri)
         this-path = uri-to-real-fs-path(provides.from-uri)
         js-require-path = P.relative(P.dirname(this-path), target-path)
-        J.j-var(js-id-of(name), j-app(j-id(const-id("require")), [clist: j-str("./" + js-require-path)]))
+        [clist:
+          J.j-var(js-id-of(name), j-app(j-id(const-id("require")), [clist: j-str("./" + js-require-path)])),
+          J.j-expr(rt-method("addModule", [clist: j-str(uri), j-id(js-id-of(name))]))
+        ]
     end
   end
 
@@ -1874,10 +1963,16 @@ fun create-prelude(prog, provides, env, options, shadow import-flags) block:
   uri-to-local-js-name = [D.mutable-string-dict:]
 
   fun import-builtin(bind-name :: A.Name, name :: String):
+    the-path = cases(Option) runtime-builtin-relative-path: 
+      | some(shadow runtime-builtin-relative-path) => runtime-builtin-relative-path + name 
+
+      | none => relative-path + "../builtin/" + name
+    end
+
     J.j-var(bind-name, 
             j-app(j-id(const-id("require")), 
                   [clist: 
-                    j-str( relative-path + runtime-builtin-relative-path + name)]))
+                    j-str(the-path)]))
   end
 
   global-import = import-builtin(GLOBAL, "global.arr.js")
@@ -1889,7 +1984,7 @@ fun create-prelude(prog, provides, env, options, shadow import-flags) block:
   reactor-import = import-builtin(REACTOR,"reactor.arr.js")
 
   # Always emit global import
-  manual-imports = [clist: global-import, runtime-import, nothing-import]
+  manual-imports = [clist: runtime-import, global-import, nothing-import]
 
   shadow manual-imports = if import-flags.table-import:
     cl-append(manual-imports, cl-sing(table-import))
@@ -1921,9 +2016,9 @@ fun create-prelude(prog, provides, env, options, shadow import-flags) block:
         uri = env.uri-by-dep-key(dep-key)
         uri-to-local-js-name.set-now(uri, name)
         uri-to-import(uri, name)
-      | else => J.j-var(const-id("SKIP"), J.j-undefined)
+      | else => CL.concat-empty
     end
-  end
+  end.foldl(_ + _, CL.concat-empty)
 
   # We _also_ insert a require for any modules that have a globally-referenced
   # name. This won't re-instantiate them since require() caches modules; it just
@@ -1938,11 +2033,11 @@ fun create-prelude(prog, provides, env, options, shadow import-flags) block:
     when not(uri-to-local-js-name.has-key-now(uri)) block:
       new-name = fresh-id(compiler-name("G"))
       uri-to-local-js-name.set-now(uri, new-name)
-      implicit-imports := cl-cons(uri-to-import(uri, new-name), implicit-imports)
+      implicit-imports := uri-to-import(uri, new-name) + implicit-imports
     end
   end
 
-  import-stmts = explicit-imports + implicit-imports + manual-imports
+  import-stmts = manual-imports + explicit-imports + implicit-imports
 
   # We also build up a list of var statements that bind local JS names for
   # all the globals used as identifiers, to make compiling uses of s-global
@@ -1953,8 +2048,14 @@ fun create-prelude(prog, provides, env, options, shadow import-flags) block:
     J.j-var(js-id-of(A.s-global(g)), J.j-dot(j-id(js-id-of(imported-as)), g))
   end
 
-  import-stmts + pyret-globals-as-js-ids
+  from-modules = for CL.map_list(k from free-bindings.keys-list-now()):
+    binding = free-bindings.get-value-now(k)
+    uri = binding.origin.uri-of-definition
+    name = binding.origin.original-name.toname()
+    J.j-var(js-id-of(binding.atom), rt-method("getModuleValue", [clist: j-str(uri), j-str(name)]))
+  end
 
+  import-stmts + pyret-globals-as-js-ids + from-modules
 end
 
 fun compile-program(prog :: A.Program, uri, env, post-env, provides, options) block:
@@ -1970,6 +2071,8 @@ fun compile-program(prog :: A.Program, uri, env, post-env, provides, options) bl
     translated-datatype-map.set-now(key, translated-datatype)
   end
 
+  free-bindings = [D.mutable-string-dict:]
+
   {ans; stmts} = compile-expr({
     uri: provides.from-uri,
     options: options,
@@ -1977,9 +2080,11 @@ fun compile-program(prog :: A.Program, uri, env, post-env, provides, options) bl
     datatypes: translated-datatype-map,
     env: env,
     post-env: post-env,
+    free-bindings: free-bindings
   }, prog.block)
 
-  prelude = create-prelude(prog, provides, env, options, import-flags)
+
+  prelude = create-prelude(prog, provides, env, free-bindings, options, import-flags)
 
   # module-body = J.j-block(global-binds + stmts + [clist: j-return(ans)])
   module-body = J.j-block(prelude + stmts + [clist: j-return(ans)])
